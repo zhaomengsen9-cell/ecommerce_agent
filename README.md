@@ -59,6 +59,12 @@ python scripts/check_dependencies.py
 ./scripts/run_agent.sh "规划一个商品管理任务，先列出你能通过 MCP 调用哪些 ERP 能力"
 ```
 
+运行 MVP 闭环场景：
+
+```bash
+./scripts/run_mvp_scenario.sh
+```
+
 只做本地结构/ERP 连通性检查:
 
 ```bash
