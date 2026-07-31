@@ -1,0 +1,30 @@
+[project]
+name = "frappe-ecommerce-agent"
+version = "0.1.0"
+description = "MCP-connected Deep Agents framework for a Frappe/ERPNext ecommerce sandbox."
+requires-python = ">=3.11"
+dependencies = [
+  "deepagents>=0.0.4",
+  "langchain-core>=0.3.0",
+  "langchain-mcp-adapters>=0.1.0",
+  "langchain-openai>=0.2.0",
+  "mcp>=1.9.0",
+  "requests>=2.32",
+]
+
+[project.optional-dependencies]
+rag = [
+  "chromadb>=0.5.0",
+  "langchain-chroma>=0.1.4",
+]
+
+[project.scripts]
+ecommerce-agent = "ecommerce_agent.agents.main_agent:main"
+ecommerce-agent-mcp = "ecommerce_agent.mcp_server.erp_server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ecommerce_agent"]
