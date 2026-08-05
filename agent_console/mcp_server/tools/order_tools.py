@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 from typing import Any
 
-from ecommerce_agent.mcp_server.erp_client import erp_client
+from agent_console.mcp_server.erp_client import erp_client
 
 
 def register_order_tools(mcp: Any) -> None:

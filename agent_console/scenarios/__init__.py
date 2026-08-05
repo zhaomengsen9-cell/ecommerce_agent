@@ -1,4 +1,4 @@
-from ecommerce_agent.scenarios.order_inventory_mvp import (
+from agent_console.scenarios.order_inventory_mvp import (
     MVP_SCENARIO_NAME,
     MVP_SCENARIO_PROMPT,
     build_mvp_task,

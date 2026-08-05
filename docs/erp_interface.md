@@ -7,7 +7,7 @@
 当前系统通过 MCP Server 暴露 ERPNext 能力。
 
 - MCP Server 名称: `frappe-ecommerce-erp`
-- 启动模块: `ecommerce_agent.mcp_server.erp_server`
+- 启动模块: `agent_console.mcp_server.erp_server`
 - 启动脚本: `scripts/run_mcp_server.sh`
 - MCP 配置文件: `mcp.json`
 
@@ -391,7 +391,7 @@ item_code, warehouse, actual_qty, projected_qty, ordered_qty, priority, recommen
 数据来源：
 
 ```text
-ecommerce_agent/rag_system/wiki/
+agent_console/rag_system/wiki/
 ```
 
 ### 7.2 `draft_campaign_strategy`

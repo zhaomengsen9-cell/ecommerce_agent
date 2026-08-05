@@ -113,7 +113,7 @@ button {
 
 .sidebar-nav {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-bottom: 16px;
 }
@@ -714,18 +714,28 @@ h1 {
   background: linear-gradient(rgba(251, 252, 250, 0), #fbfcfa 22%);
 }
 
+.hitl-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(23, 32, 27, 0.42);
+  backdrop-filter: blur(8px);
+}
+
 .hitl-panel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  max-width: 980px;
-  margin: 0 auto 14px;
-  padding: 16px;
+  display: grid;
+  gap: 16px;
+  width: min(680px, 100%);
+  max-height: min(780px, 88vh);
+  overflow: auto;
+  padding: 22px;
   color: #32250d;
-  background: #fff7df;
+  background: #fffaf0;
   border: 1px solid #ead28b;
-  box-shadow: var(--shadow);
+  box-shadow: 0 26px 80px rgba(23, 32, 27, 0.24);
 }
 
 .hitl-panel strong {
@@ -744,6 +754,65 @@ h1 {
   display: flex;
   flex: 0 0 auto;
   gap: 10px;
+  justify-content: flex-end;
+}
+
+.approval-summary {
+  display: grid;
+  gap: 12px;
+}
+
+.approval-summary dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.approval-summary dl div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.approval-summary dt {
+  color: #8d7437;
+  font-weight: 900;
+}
+
+.approval-summary dd {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.approval-summary details {
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #ead28b;
+}
+
+.approval-summary summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.approval-summary pre {
+  margin: 10px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "SFMono-Regular", "Cascadia Code", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.approval-summary textarea {
+  width: 100%;
+  min-height: 86px;
+  padding: 12px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #ead28b;
+  outline: none;
+  resize: vertical;
 }
 
 .preset-row {
@@ -955,6 +1024,139 @@ h1 {
   font-weight: 800;
 }
 
+.danger-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  color: #fff;
+  background: var(--danger);
+  border: 0;
+  font-weight: 800;
+}
+
+.memory-view {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 0 36px;
+}
+
+.memory-toolbar,
+.memory-form,
+.memory-item {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.memory-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px;
+}
+
+.memory-toolbar strong,
+.memory-toolbar span {
+  display: block;
+}
+
+.memory-toolbar strong {
+  font-size: 18px;
+}
+
+.memory-toolbar span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.memory-toolbar select,
+.memory-form select,
+.memory-item select {
+  min-height: 42px;
+  padding: 0 11px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #d9e2db;
+}
+
+.memory-form {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 130px;
+  gap: 12px;
+  align-items: stretch;
+  margin-top: 14px;
+  padding: 14px;
+}
+
+.memory-form textarea,
+.memory-item textarea {
+  width: 100%;
+  min-height: 88px;
+  padding: 12px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #d9e2db;
+  outline: none;
+  resize: vertical;
+}
+
+.memory-list {
+  display: grid;
+  gap: 12px;
+  width: min(980px, 100%);
+  margin: 14px auto 0;
+}
+
+.memory-item {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.memory-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.memory-meta span {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  padding: 0 10px;
+  color: #2363a5;
+  background: #eaf4ff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.memory-meta em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.memory-item p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+
+.memory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .error-line {
   margin: 0;
   color: var(--danger);
@@ -992,7 +1194,13 @@ h1 {
   }
 
   .tool-grid,
-  .approval-item {
+  .approval-item,
+  .memory-form {
     grid-template-columns: 1fr;
+  }
+
+  .memory-toolbar {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

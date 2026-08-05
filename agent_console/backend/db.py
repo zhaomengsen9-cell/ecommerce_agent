@@ -40,7 +40,7 @@ def get_db() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    from ecommerce_agent.backend.models import backfill_legacy_conversations, seed_default_users
+    from agent_console.backend.db_models import backfill_legacy_conversations, seed_default_users
 
     Base.metadata.create_all(bind=engine)
     _ensure_legacy_schema()
@@ -51,7 +51,13 @@ def init_db() -> None:
 
 def _ensure_legacy_schema() -> None:
     inspector = inspect(engine)
-    if "agent_tasks" not in inspector.get_table_names():
+    table_names = inspector.get_table_names()
+    if "agent_conversations" in table_names:
+        conversation_columns = {column["name"] for column in inspector.get_columns("agent_conversations")}
+        if "summary" not in conversation_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE agent_conversations ADD COLUMN summary TEXT"))
+    if "agent_tasks" not in table_names:
         return
     columns = {column["name"] for column in inspector.get_columns("agent_tasks")}
     if "conversation_id" in columns:

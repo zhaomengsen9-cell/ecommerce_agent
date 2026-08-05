@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import {
   Activity,
   AlertTriangle,
+  Brain,
   Bot,
   CheckCircle2,
   ChevronDown,
@@ -14,6 +15,7 @@ import {
   Search,
   Send,
   ShieldCheck,
+  Trash2,
   UserRound,
   Wrench,
 } from "lucide-react";
@@ -30,6 +32,7 @@ function App() {
   const [selectedConversationId, setSelectedConversationId] = useState("");
   const [searchText, setSearchText] = useState("");
   const [showTools, setShowTools] = useState(true);
+  const [activeView, setActiveView] = useState("chat");
 
   useEffect(() => {
     if (!token) return;
@@ -85,6 +88,8 @@ function App() {
         currentUser={user}
         onLogout={logout}
         onNewChat={() => setSelectedConversationId("")}
+        activeView={activeView}
+        onSetView={setActiveView}
         onOpenLatest={() => {
           const latestConversation = groupConversations(tasks)[0];
           if (latestConversation) {
@@ -97,6 +102,7 @@ function App() {
         onSearch={setSearchText}
         onSelectConversation={(conversationId) => {
           setSelectedConversationId(conversationId);
+          setActiveView("chat");
         }}
       />
 
@@ -104,22 +110,26 @@ function App() {
         <header className="chat-topbar">
           <div>
             <p className="eyebrow">E-commerce ERP Copilot</p>
-            <h1>{viewTitle(selectedConversation)}</h1>
+            <h1>{activeView === "memory" ? "长期记忆" : viewTitle(selectedConversation)}</h1>
           </div>
           <Health health={health} onRefresh={refresh} />
         </header>
 
-        <ChatView
-          selectedConversation={selectedConversation}
-          tasks={selectedConversationTasks}
-          showTools={showTools}
-          setShowTools={setShowTools}
-          token={token}
-          onCreated={(conversationId) => {
-            setSelectedConversationId(conversationId);
-            refresh(conversationId);
-          }}
-        />
+        {activeView === "memory" ? (
+          <MemoryView token={token} conversations={conversations} selectedConversationId={selectedConversationId} />
+        ) : (
+          <ChatView
+            selectedConversation={selectedConversation}
+            tasks={selectedConversationTasks}
+            showTools={showTools}
+            setShowTools={setShowTools}
+            token={token}
+            onCreated={(conversationId) => {
+              setSelectedConversationId(conversationId);
+              refresh(conversationId);
+            }}
+          />
+        )}
       </main>
     </div>
   );
@@ -129,6 +139,8 @@ function ConversationSidebar({
   currentUser,
   onLogout,
   onNewChat,
+  activeView,
+  onSetView,
   onOpenLatest,
   searchText,
   selectedConversationId,
@@ -151,8 +163,11 @@ function ConversationSidebar({
       </button>
 
       <div className="sidebar-nav">
-        <button type="button" className="active" onClick={onOpenLatest}>
+        <button type="button" className={activeView === "chat" ? "active" : ""} onClick={() => { onSetView("chat"); onOpenLatest(); }}>
           <MessagesSquare size={18} />会话
+        </button>
+        <button type="button" className={activeView === "memory" ? "active" : ""} onClick={() => onSetView("memory")}>
+          <Brain size={18} />记忆
         </button>
         <a className="sidebar-link" href={ERP_URL} target="_blank" rel="noreferrer">
           <Database size={18} />ERP
@@ -292,7 +307,7 @@ function ChatView({ selectedConversation, tasks, showTools, setShowTools, token,
           </>
         )}
       </div>
-      {selectedConversation && <HumanLoopPanel task={tasks[tasks.length - 1]} />}
+      {selectedConversation && <HumanLoopPanel task={tasks[tasks.length - 1]} token={token} onChanged={() => onCreated(selectedConversation.id)} />}
       <ChatComposer
         conversationId={selectedConversation?.id || ""}
         showTools={showTools}
@@ -449,26 +464,241 @@ function MarkdownView({ content }) {
   return <div className="markdown-view">{blocks}</div>;
 }
 
-function HumanLoopPanel({ task }) {
-  if (!["waiting_approval", "needs_input"].includes(task.status)) return null;
+function HumanLoopPanel({ task, token, onChanged }) {
+  const [note, setNote] = useState("");
+  const [inputResponse, setInputResponse] = useState("");
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+
+  if (!task || !["waiting_approval", "needs_input"].includes(task.status)) return null;
   const needsApproval = task.status === "waiting_approval";
+  const approval = task.approval || {};
+  const inputRequest = task.input_request || {};
+
+  async function decide(decision) {
+    setBusy(decision);
+    setError("");
+    try {
+      await apiPost(`/api/agent/tasks/${task.task_id}/${decision}`, token, { note });
+      setNote("");
+      onChanged();
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function submitInput() {
+    if (!inputResponse.trim()) return;
+    setBusy("input");
+    setError("");
+    try {
+      await apiPost(`/api/agent/tasks/${task.task_id}/input`, token, { response: inputResponse });
+      setInputResponse("");
+      onChanged();
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setBusy("");
+    }
+  }
+
   return (
-    <div className="hitl-panel">
-      <div>
-        <strong>{needsApproval ? "需要人工审批" : "需要补充信息"}</strong>
-        <p>{needsApproval ? "Agent 遇到敏感 ERP 操作，已暂停执行，等待用户确认。" : "Agent 缺少继续执行所需的信息，请补充后继续。"}</p>
-      </div>
-      <div className="hitl-actions">
-        {needsApproval ? (
-          <>
-            <button type="button" className="ghost-btn">拒绝</button>
-            <button type="button" className="primary-btn">批准继续</button>
-          </>
-        ) : (
-          <button type="button" className="primary-btn">补充信息</button>
+    <div className="hitl-overlay">
+      <div className="hitl-panel" role="dialog" aria-modal="true">
+        <div>
+          <strong>{needsApproval ? "需要人工审批" : "需要补充信息"}</strong>
+          <p>{needsApproval ? "Agent 遇到敏感 ERP 操作，已暂停执行，等待用户确认。" : "Agent 缺少继续执行所需的信息，请补充后继续。"}</p>
+        </div>
+
+        {needsApproval && (
+          <div className="approval-summary">
+            <dl>
+              <div><dt>操作</dt><dd>{approval.action || approval.tool_name || "未知操作"}</dd></div>
+              <div><dt>风险</dt><dd>{approval.risk || "高风险 ERP 写操作"}</dd></div>
+              <div><dt>说明</dt><dd>{approval.details || "无"}</dd></div>
+            </dl>
+            <details>
+              <summary>查看工具参数</summary>
+              <pre>{compactJson(approval.tool_args || {})}</pre>
+            </details>
+            <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="审批备注，可选" rows={3} />
+          </div>
         )}
+
+        {!needsApproval && (
+          <div className="approval-summary">
+            <dl>
+              <div><dt>问题</dt><dd>{inputRequest.question || "请补充继续执行所需的信息。"}</dd></div>
+              <div><dt>原因</dt><dd>{inputRequest.reason || "Agent 判断当前任务缺少必要上下文。"}</dd></div>
+              {Boolean(inputRequest.required_fields?.length) && (
+                <div><dt>需要</dt><dd>{inputRequest.required_fields.join("、")}</dd></div>
+              )}
+            </dl>
+            <textarea
+              value={inputResponse}
+              onChange={(event) => setInputResponse(event.target.value)}
+              placeholder="在这里补充信息..."
+              rows={4}
+            />
+          </div>
+        )}
+
+        {error && <p className="error-line">{error}</p>}
+
+        <div className="hitl-actions">
+          {needsApproval ? (
+            <>
+              <button type="button" className="ghost-btn" disabled={Boolean(busy)} onClick={() => decide("reject")}>
+                {busy === "reject" ? "拒绝中" : "拒绝"}
+              </button>
+              <button type="button" className="primary-btn" disabled={Boolean(busy)} onClick={() => decide("approve")}>
+                {busy === "approve" ? "执行中" : "批准继续"}
+              </button>
+            </>
+          ) : (
+            <button type="button" className="primary-btn" disabled={busy === "input" || !inputResponse.trim()} onClick={submitInput}>
+              {busy === "input" ? "提交中" : "提交并继续"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+function MemoryView({ token, conversations, selectedConversationId }) {
+  const [memories, setMemories] = useState([]);
+  const [conversationFilter, setConversationFilter] = useState("");
+  const [content, setContent] = useState("");
+  const [memoryType, setMemoryType] = useState("manual_note");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setConversationFilter(selectedConversationId || "");
+  }, [selectedConversationId]);
+
+  useEffect(() => {
+    refreshMemories();
+  }, [token, conversationFilter]);
+
+  async function refreshMemories() {
+    if (!token) return;
+    const query = conversationFilter ? `?conversation_id=${encodeURIComponent(conversationFilter)}` : "";
+    const data = await api(`/api/memories${query}`, token).catch((error) => {
+      setError(error.message);
+      return [];
+    });
+    setMemories(data);
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    if (!content.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      await apiPost("/api/memories", token, {
+        content,
+        memory_type: memoryType,
+        conversation_id: conversationFilter || null,
+      });
+      setContent("");
+      await refreshMemories();
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="memory-view">
+      <div className="memory-toolbar">
+        <div>
+          <strong>Agent 长期记忆</strong>
+          <span>默认给模型看摘要，需要细节时再查完整任务记录。</span>
+        </div>
+        <select value={conversationFilter} onChange={(event) => setConversationFilter(event.target.value)}>
+          <option value="">全部记忆</option>
+          {conversations.map((conversation) => (
+            <option key={conversation.id} value={conversation.id}>{conversation.title}</option>
+          ))}
+        </select>
+      </div>
+
+      <form className="memory-form" onSubmit={submit}>
+        <select value={memoryType} onChange={(event) => setMemoryType(event.target.value)}>
+          <option value="manual_note">人工备注</option>
+          <option value="business_fact">业务事实</option>
+          <option value="user_preference">用户偏好</option>
+          <option value="policy_note">规则说明</option>
+        </select>
+        <textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder="添加一条希望 Agent 长期记住的内容..." rows={3} />
+        <button className="primary-btn" disabled={busy || !content.trim()}>保存记忆</button>
+      </form>
+
+      {error && <p className="error-line">{error}</p>}
+
+      <div className="memory-list">
+        {memories.map((memory) => (
+          <MemoryItem key={memory.id} memory={memory} token={token} onChanged={refreshMemories} />
+        ))}
+        {!memories.length && <p className="empty-note">暂无记忆。完成一次 Agent 任务后会自动生成任务摘要，也可以在这里手动添加。</p>}
+      </div>
+    </section>
+  );
+}
+
+function MemoryItem({ memory, token, onChanged }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(memory.content);
+  const [memoryType, setMemoryType] = useState(memory.memory_type);
+
+  async function save() {
+    await apiPut(`/api/memories/${memory.id}`, token, { content: draft, memory_type: memoryType });
+    setEditing(false);
+    onChanged();
+  }
+
+  async function remove() {
+    await apiDelete(`/api/memories/${memory.id}`, token);
+    onChanged();
+  }
+
+  return (
+    <article className="memory-item">
+      <div className="memory-meta">
+        <span>{memoryTypeLabel(memory.memory_type)}</span>
+        <em>{relativeTime(memory.updated_at)}</em>
+      </div>
+      {editing ? (
+        <>
+          <select value={memoryType} onChange={(event) => setMemoryType(event.target.value)}>
+            <option value="manual_note">人工备注</option>
+            <option value="task_summary">任务摘要</option>
+            <option value="business_fact">业务事实</option>
+            <option value="user_preference">用户偏好</option>
+            <option value="policy_note">规则说明</option>
+          </select>
+          <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={5} />
+          <div className="memory-actions">
+            <button type="button" className="ghost-btn" onClick={() => { setEditing(false); setDraft(memory.content); }}>取消</button>
+            <button type="button" className="primary-btn" onClick={save}>保存</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p>{memory.content}</p>
+          <div className="memory-actions">
+            <button type="button" className="ghost-btn" onClick={() => setEditing(true)}>编辑</button>
+            <button type="button" className="danger-btn" onClick={remove}><Trash2 size={16} />删除</button>
+          </div>
+        </>
+      )}
+    </article>
   );
 }
 
@@ -796,6 +1026,17 @@ function truncateText(value, maxLength) {
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
 
+function memoryTypeLabel(type) {
+  const labels = {
+    manual_note: "人工备注",
+    task_summary: "任务摘要",
+    business_fact: "业务事实",
+    user_preference: "用户偏好",
+    policy_note: "规则说明",
+  };
+  return labels[type] || type;
+}
+
 async function post(path, body) {
   const response = await fetch(`${API_BASE}${path}`, {
     method: "POST",
@@ -817,6 +1058,23 @@ async function apiPost(path, token, body) {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
+  });
+  return parse(response);
+}
+
+async function apiPut(path, token, body) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return parse(response);
+}
+
+async function apiDelete(path, token) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
   });
   return parse(response);
 }

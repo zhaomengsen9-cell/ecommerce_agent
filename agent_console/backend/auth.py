@@ -12,8 +12,8 @@ from typing import Annotated
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from ecommerce_agent.backend.db import db_session
-from ecommerce_agent.backend.models import User, verify_password
+from agent_console.backend.db import db_session
+from agent_console.backend.db_models import User, verify_password
 
 
 AUTH_SECRET = os.getenv("AGENT_AUTH_SECRET", "dev-agent-secret-change-me")

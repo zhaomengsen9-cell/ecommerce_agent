@@ -8,7 +8,7 @@ try:
 except ImportError:  # pragma: no cover - helps smoke checks before dependency install.
     requests = None
 
-from ecommerce_agent.config import settings
+from agent_console.config import settings
 
 
 class ERPClientError(RuntimeError):

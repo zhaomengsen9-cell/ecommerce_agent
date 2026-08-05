@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from ecommerce_agent.agents.main_agent import run_task_sync
-from ecommerce_agent.scenarios import MVP_SCENARIO_NAME, build_mvp_task
+from agent_console.agents.main_agent import run_task_sync
+from agent_console.scenarios import MVP_SCENARIO_NAME, build_mvp_task
 
 
 def main() -> None:

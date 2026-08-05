@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from ecommerce_agent.mcp_server.erp_client import erp_client
-from ecommerce_agent.rag_system.wiki_manager import KnowledgeBase
-from ecommerce_agent.sandbox_gateway.permission import ApprovalRequest, require_approval
+from agent_console.mcp_server.erp_client import erp_client
+from agent_console.rag_system.wiki_manager import KnowledgeBase
+from agent_console.sandbox_gateway.permission import ApprovalRequest, require_approval
 
 
 knowledge_base = KnowledgeBase()
@@ -37,11 +37,15 @@ def register_marketing_tools(mcp: Any) -> None:
     @mcp.tool()
     def create_campaign(campaign_name: str, description: str, reason: str) -> dict[str, Any]:
         """Create an ERPNext Campaign document. Requires approval."""
-        require_approval(
+        approval = require_approval(
             ApprovalRequest(
                 action="create_campaign",
                 risk="Campaign creation can trigger customer-facing and operational workflows.",
                 details=f"campaign_name={campaign_name}, reason={reason}",
+                tool_name="create_campaign",
+                tool_args={"campaign_name": campaign_name, "description": description, "reason": reason},
             )
         )
+        if approval:
+            return approval
         return erp_client.create_doc("Campaign", {"campaign_name": campaign_name, "description": description})

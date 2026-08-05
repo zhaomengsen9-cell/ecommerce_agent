@@ -6,24 +6,14 @@ import json
 import sys
 from typing import Any
 
-from ecommerce_agent.agents.sub_agents import SUBAGENTS
-from ecommerce_agent.config import ROOT, settings
+from agent_console.agents.hitl_tools import request_human_input
+from agent_console.agents.sub_agents import SUBAGENTS
+from agent_console.config import ROOT, settings
 
 
-HARNESS_INSTRUCTIONS = """You are the supervisor agent for an ecommerce ERP sandbox.
-
-Architecture:
-- You do not connect to ERPNext directly.
-- You discover and call ERP capabilities through the local MCP server.
-- You must maintain a readable todo plan with the built-in write_todos tool before multi-step work.
-- Update the todo plan when the task changes or a step completes.
-- You plan tasks, delegate where useful, manage context, and request approval for risky writes.
-- Prefer business-specific MCP tools over generic ERP tools.
-- Use product tools for Item and Item Price work, order tools for Sales Order analysis, inventory tools for Bin stock checks, and marketing/RAG tools for campaign planning.
-- Use generic erp_create_doc and erp_update_doc only when no business-specific tool exists.
-- Never invent ERP data. If tool results are empty or incomplete, say so explicitly.
-- For high-risk write operations, explain the business reason and wait for approval before execution.
-- Always explain completed steps, tool-backed findings, pending approvals, and remaining implementation gaps clearly.
+FALLBACK_INSTRUCTIONS = """You are the supervisor agent for an ecommerce ERP sandbox.
+Use MCP tools to inspect ERPNext data, maintain todos for multi-step tasks, and request approval before risky writes.
+Never invent ERP data.
 """
 
 
@@ -31,7 +21,7 @@ def mcp_stdio_config() -> dict[str, Any]:
     return {
         "erp": {
             "command": sys.executable,
-            "args": ["-m", "ecommerce_agent.mcp_server.erp_server"],
+            "args": ["-m", "agent_console.mcp_server.erp_server"],
             "transport": "stdio",
             "cwd": str(ROOT),
         }
@@ -44,19 +34,21 @@ async def build_agent():
 
     client = MultiServerMCPClient(mcp_stdio_config())
     tools = await client.get_tools()
+    tools.append(request_human_input)
     return create_deep_agent(
         tools=tools,
-        system_prompt=HARNESS_INSTRUCTIONS,
+        system_prompt=load_system_prompt(),
         subagents=SUBAGENTS,
-        interrupt_on={
-            "erp_create_doc": True,
-            "erp_update_doc": True,
-            "update_item_price": True,
-            "set_product_disabled": True,
-            "create_campaign": True,
-        },
         model=settings.agent_model,
     )
+
+
+def load_system_prompt() -> str:
+    instructions_path = ROOT / "AGENT.md"
+    if not instructions_path.exists():
+        return FALLBACK_INSTRUCTIONS
+    content = instructions_path.read_text(encoding="utf-8").strip()
+    return content or FALLBACK_INSTRUCTIONS
 
 
 async def run_task(task: str) -> Any:

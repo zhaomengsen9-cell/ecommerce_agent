@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 
-from ecommerce_agent.config import settings
-from ecommerce_agent.mcp_server.erp_client import ERPClientError, erp_client
-from ecommerce_agent.rag_system.wiki_manager import KnowledgeBase
+from agent_console.config import settings
+from agent_console.mcp_server.erp_client import ERPClientError, erp_client
+from agent_console.rag_system.wiki_manager import KnowledgeBase
 
 
 def main() -> None:

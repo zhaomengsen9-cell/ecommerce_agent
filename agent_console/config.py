@@ -32,7 +32,7 @@ class Settings:
     frappe_password: str = os.getenv("FRAPPE_PASSWORD", "admin")
 
     agent_model: str = os.getenv("AGENT_MODEL", "openai:gpt-4.1")
-    human_approval_mode: str = os.getenv("HUMAN_APPROVAL_MODE", "terminal")
+    human_approval_mode: str = os.getenv("HUMAN_APPROVAL_MODE", "web")
     erp_mcp_transport: str = os.getenv("ERP_MCP_TRANSPORT", "stdio")
     agent_memory_dir: Path = ROOT / os.getenv("AGENT_MEMORY_DIR", ".agent_memory")
 

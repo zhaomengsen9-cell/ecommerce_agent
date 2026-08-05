@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ecommerce_agent.mcp_server.erp_client import erp_client
+from agent_console.mcp_server.erp_client import erp_client
 
 
 def register_inventory_tools(mcp: Any) -> None:

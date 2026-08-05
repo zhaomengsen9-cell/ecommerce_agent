@@ -9,7 +9,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from ecommerce_agent.mcp_server.erp_client import ERPClientError, erp_client
+from agent_console.mcp_server.erp_client import ERPClientError, erp_client
 
 
 PREFIX = "AGENT-DEMO"

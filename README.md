@@ -4,12 +4,12 @@
 
 ## Architecture
 
-- `ecommerce_agent/agents/`: Agent Runtime，包含 DeepAgents 主 Agent、任务规划提示词和专业子 Agent 配置。
-- `ecommerce_agent/mcp_server/`: ERPNext 隔离层，负责 ERP API Client、MCP Server 和业务 Tools。
-- `ecommerce_agent/rag_system/`: 知识层，存放运营策略、ERPNext 业务规则和 Wiki 检索逻辑。
-- `ecommerce_agent/sandbox_gateway/`: 安全层，处理高风险操作审批和人工确认。
-- `ecommerce_agent/scenarios/`: 可复用业务场景脚本，例如销售订单与库存风险分析。
-- `ecommerce_agent/backend/`: FastAPI 后端，提供登录、任务提交、任务查询和 ERP 健康检查接口。
+- `agent_console/agents/`: Agent Runtime，包含 DeepAgents 主 Agent、任务规划提示词和专业子 Agent 配置。
+- `agent_console/mcp_server/`: ERPNext 隔离层，负责 ERP API Client、MCP Server 和业务 Tools。
+- `agent_console/rag_system/`: 知识层，存放运营策略、ERPNext 业务规则和 Wiki 检索逻辑。
+- `agent_console/sandbox_gateway/`: 安全层，处理高风险操作审批和人工确认。
+- `agent_console/scenarios/`: 可复用业务场景脚本，例如销售订单与库存风险分析。
+- `agent_console/backend/`: FastAPI 后端，提供登录、任务提交、任务查询和 ERP 健康检查接口。
 - `frontend/`: React + Vite 前端控制台。
 - `docs/`: 接口文档、架构说明和业务说明。
 - `scripts/`: 本地启动、检查、造数和 smoke test 脚本。
@@ -17,7 +17,7 @@
 
 ```text
 .
-├── ecommerce_agent/
+├── agent_console/
 │   ├── agents/
 │   │   ├── main_agent.py
 │   │   └── sub_agents.py
@@ -56,7 +56,7 @@
 ## Quick Start
 
 ```bash
-cd /Users/zms/programs/frappe_docker/ecommerce_agent
+cd /Users/zms/programs/ecommerce_agent
 conda activate <your-env>
 python -m pip install -r requirements.txt
 ```
@@ -142,7 +142,7 @@ admin / admin123
 cd /Users/zms/programs/frappe_docker
 docker compose -f pwd.yml up -d
 
-cd /Users/zms/programs/frappe_docker/ecommerce_agent
+cd /Users/zms/programs/ecommerce_agent
 python scripts/seed_demo_data.py --dry-run
 python scripts/seed_demo_data.py
 ```

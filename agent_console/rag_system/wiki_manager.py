@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from ecommerce_agent.config import ROOT, settings
+from agent_console.config import ROOT, settings
 
 
 @dataclass
@@ -15,7 +15,7 @@ class KnowledgeHit:
 
 class KnowledgeBase:
     def __init__(self, knowledge_dir: Path | None = None) -> None:
-        self.knowledge_dir = knowledge_dir or ROOT / "ecommerce_agent" / "rag_system" / "wiki"
+        self.knowledge_dir = knowledge_dir or ROOT / "agent_console" / "rag_system" / "wiki"
         self._chunks = self._load_markdown_chunks()
 
     def search(self, query: str, k: int = 4) -> list[KnowledgeHit]:

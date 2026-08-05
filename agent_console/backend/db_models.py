@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Table, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from ecommerce_agent.backend.db import Base
+from agent_console.backend.db import Base
 
 
 user_roles = Table(
@@ -53,6 +53,7 @@ class AgentConversation(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(120), nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
@@ -102,6 +103,49 @@ class AuditLog(Base):
     event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     event_payload: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class AgentMemory(Base):
+    __tablename__ = "agent_memories"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    conversation_id: Mapped[str | None] = mapped_column(
+        ForeignKey("agent_conversations.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    source_task_id: Mapped[str | None] = mapped_column(ForeignKey("agent_tasks.id", ondelete="SET NULL"), nullable=True, index=True)
+    memory_type: Mapped[str] = mapped_column(String(64), default="task_summary", nullable=False, index=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    memory_metadata: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    user: Mapped[User] = relationship()
+    conversation: Mapped[AgentConversation | None] = relationship()
+    source_task: Mapped[AgentTask | None] = relationship()
+
+
+class AgentApproval(Base):
+    __tablename__ = "agent_approvals"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    task_id: Mapped[str] = mapped_column(ForeignKey("agent_tasks.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False, index=True)
+    action: Mapped[str] = mapped_column(String(128), nullable=False)
+    risk: Mapped[str] = mapped_column(Text, nullable=False)
+    details: Mapped[str] = mapped_column(Text, nullable=False)
+    tool_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    tool_args: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    decision_note: Mapped[str | None] = mapped_column(Text)
+    execution_result: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    task: Mapped[AgentTask] = relationship()
+    user: Mapped[User] = relationship()
 
 
 def hash_password(password: str, *, iterations: int = 120_000) -> str:

@@ -2,7 +2,7 @@
   "mcpServers": {
     "frappe-ecommerce-erp": {
       "command": "python",
-      "args": ["-m", "ecommerce_agent.mcp_server.erp_server"],
+      "args": ["-m", "agent_console.mcp_server.erp_server"],
       "env": {
         "PYTHONPATH": "."
       }

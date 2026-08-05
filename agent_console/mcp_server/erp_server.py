@@ -4,14 +4,14 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from ecommerce_agent.mcp_server.erp_client import erp_client
-from ecommerce_agent.mcp_server.tools import (
+from agent_console.mcp_server.erp_client import erp_client
+from agent_console.mcp_server.tools import (
     register_inventory_tools,
     register_marketing_tools,
     register_order_tools,
     register_product_tools,
 )
-from ecommerce_agent.sandbox_gateway.permission import ApprovalRequest, require_approval
+from agent_console.sandbox_gateway.permission import ApprovalRequest, require_approval
 
 
 mcp = FastMCP("frappe-ecommerce-erp")
@@ -43,26 +43,34 @@ def erp_get_doc(doctype: str, name: str) -> dict[str, Any]:
 @mcp.tool()
 def erp_create_doc(doctype: str, doc: dict[str, Any], reason: str) -> dict[str, Any]:
     """Generic write operation for creating Frappe documents. Requires approval."""
-    require_approval(
+    approval = require_approval(
         ApprovalRequest(
             action="erp_create_doc",
             risk="Creates ERP data and may affect downstream business workflows.",
             details=f"doctype={doctype}, reason={reason}, doc_keys={sorted(doc.keys())}",
+            tool_name="erp_create_doc",
+            tool_args={"doctype": doctype, "doc": doc, "reason": reason},
         )
     )
+    if approval:
+        return approval
     return erp_client.create_doc(doctype=doctype, doc=doc)
 
 
 @mcp.tool()
 def erp_update_doc(doctype: str, name: str, updates: dict[str, Any], reason: str) -> dict[str, Any]:
     """Generic write operation for updating Frappe documents. Requires approval."""
-    require_approval(
+    approval = require_approval(
         ApprovalRequest(
             action="erp_update_doc",
             risk="Updates ERP data and may affect customer-facing or financial records.",
             details=f"doctype={doctype}, name={name}, reason={reason}, update_keys={sorted(updates.keys())}",
+            tool_name="erp_update_doc",
+            tool_args={"doctype": doctype, "name": name, "updates": updates, "reason": reason},
         )
     )
+    if approval:
+        return approval
     return erp_client.update_doc(doctype=doctype, name=name, updates=updates)
 
 

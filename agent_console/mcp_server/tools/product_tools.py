@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from ecommerce_agent.mcp_server.erp_client import erp_client
-from ecommerce_agent.sandbox_gateway.permission import ApprovalRequest, require_approval
+from agent_console.mcp_server.erp_client import erp_client
+from agent_console.sandbox_gateway.permission import ApprovalRequest, require_approval
 
 
 def register_product_tools(mcp: Any) -> None:
@@ -55,23 +55,31 @@ def register_product_tools(mcp: Any) -> None:
         if not matches:
             raise ValueError(f"No Item Price found for item_code={item_code!r}, price_list={price_list!r}")
         current = matches[0]
-        require_approval(
+        approval = require_approval(
             ApprovalRequest(
                 action="update_item_price",
                 risk="Price changes can affect storefront revenue, margin, and downstream orders.",
                 details=f"{item_code} {price_list}: {current.get('price_list_rate')} -> {new_rate}. Reason: {reason}",
+                tool_name="update_item_price",
+                tool_args={"item_code": item_code, "price_list": price_list, "new_rate": new_rate, "reason": reason},
             )
         )
+        if approval:
+            return approval
         return erp_client.update_doc("Item Price", current["name"], {"price_list_rate": new_rate})
 
     @mcp.tool()
     def set_product_disabled(item_code: str, disabled: bool, reason: str) -> dict[str, Any]:
         """Enable or disable an ERPNext Item. Requires approval."""
-        require_approval(
+        approval = require_approval(
             ApprovalRequest(
                 action="set_product_disabled",
                 risk="Changing product availability can affect selling, fulfillment, and catalog operations.",
                 details=f"item_code={item_code}, disabled={disabled}, reason={reason}",
+                tool_name="set_product_disabled",
+                tool_args={"item_code": item_code, "disabled": disabled, "reason": reason},
             )
         )
+        if approval:
+            return approval
         return erp_client.update_doc("Item", item_code, {"disabled": 1 if disabled else 0})
