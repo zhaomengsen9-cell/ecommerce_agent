@@ -35,22 +35,35 @@ class ERPClient:
         self.session.headers.update({"Accept": "application/json", "X-Frappe-Site-Name": self.site})
         if self.api_key and self.api_secret:
             self.session.headers.update({"Authorization": f"token {self.api_key}:{self.api_secret}"})
+        self._logged_in = False
 
     def login_if_needed(self) -> None:
         if self.session is None:
             raise ERPClientError("Missing dependency: install requests or run `pip install -e .` first.")
-        if self.api_key and self.api_secret:
+        if self.api_key and self.api_secret and not self._logged_in:
             return
+        if self._logged_in:
+            return
+        self.login_with_password()
+
+    def login_with_password(self) -> None:
+        if self.session is None:
+            raise ERPClientError("Missing dependency: install requests or run `pip install -e .` first.")
+        self.session.headers.pop("Authorization", None)
         response = self.session.post(
             f"{self.base_url}/api/method/login",
             json={"usr": self.username, "pwd": self.password},
             timeout=30,
         )
         self._raise_for_status(response)
+        self._logged_in = True
 
     def ping(self) -> dict[str, Any]:
         self.login_if_needed()
         response = self.session.get(f"{self.base_url}/api/method/frappe.auth.get_logged_user", timeout=10)
+        if response.status_code == 401 and self.api_key and self.api_secret:
+            self.login_with_password()
+            response = self.session.get(f"{self.base_url}/api/method/frappe.auth.get_logged_user", timeout=10)
         return self._json_response(response)
 
     def list_docs(
@@ -70,22 +83,42 @@ class ERPClient:
         if order_by:
             params["order_by"] = order_by
         response = self.session.get(f"{self.base_url}/api/resource/{doctype}", params=params, timeout=30)
+        if response.status_code == 401 and self.api_key and self.api_secret:
+            self.login_with_password()
+            response = self.session.get(f"{self.base_url}/api/resource/{doctype}", params=params, timeout=30)
         return self._json_response(response).get("data", [])
 
     def get_doc(self, doctype: str, name: str) -> dict[str, Any]:
         self.login_if_needed()
         response = self.session.get(f"{self.base_url}/api/resource/{doctype}/{name}", timeout=30)
+        if response.status_code == 401 and self.api_key and self.api_secret:
+            self.login_with_password()
+            response = self.session.get(f"{self.base_url}/api/resource/{doctype}/{name}", timeout=30)
         return self._json_response(response).get("data", {})
 
     def create_doc(self, doctype: str, doc: dict[str, Any]) -> dict[str, Any]:
         self.login_if_needed()
         response = self.session.post(f"{self.base_url}/api/resource/{doctype}", json=doc, timeout=30)
+        if response.status_code == 401 and self.api_key and self.api_secret:
+            self.login_with_password()
+            response = self.session.post(f"{self.base_url}/api/resource/{doctype}", json=doc, timeout=30)
         return self._json_response(response).get("data", {})
 
     def update_doc(self, doctype: str, name: str, updates: dict[str, Any]) -> dict[str, Any]:
         self.login_if_needed()
         response = self.session.put(f"{self.base_url}/api/resource/{doctype}/{name}", json=updates, timeout=30)
+        if response.status_code == 401 and self.api_key and self.api_secret:
+            self.login_with_password()
+            response = self.session.put(f"{self.base_url}/api/resource/{doctype}/{name}", json=updates, timeout=30)
         return self._json_response(response).get("data", {})
+
+    def call_method(self, method: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        self.login_if_needed()
+        response = self.session.post(f"{self.base_url}/api/method/{method}", json=payload or {}, timeout=30)
+        if response.status_code == 401 and self.api_key and self.api_secret:
+            self.login_with_password()
+            response = self.session.post(f"{self.base_url}/api/method/{method}", json=payload or {}, timeout=30)
+        return self._json_response(response)
 
     @staticmethod
     def _json(value: Any) -> str:

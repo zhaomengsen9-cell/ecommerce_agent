@@ -4,12 +4,18 @@ version = "0.1.0"
 description = "MCP-connected Deep Agents framework for a Frappe/ERPNext ecommerce sandbox."
 requires-python = ">=3.11"
 dependencies = [
-  "deepagents>=0.0.4",
-  "langchain-core>=0.3.0",
-  "langchain-mcp-adapters>=0.1.0",
-  "langchain-openai>=0.2.0",
-  "mcp>=1.9.0",
-  "requests>=2.32",
+  "deepagents>=0.6.12",
+  "fastapi>=0.115.0",
+  "langchain-core>=1.5.1",
+  "langchain-mcp-adapters>=0.3.1",
+  "langchain-deepseek>=0.1.4",
+  "langchain-openai>=1.4.1",
+  "mcp>=1.28.1",
+  "pydantic>=2.7.0",
+  "psycopg[binary]>=3.2.0",
+  "requests>=2.34.2",
+  "sqlalchemy>=2.0.0",
+  "uvicorn[standard]>=0.30.0",
 ]
 
 [project.optional-dependencies]

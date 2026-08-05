@@ -1,0 +1,13 @@
+{
+  "name": "frappe-ecommerce-agent-app",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npm --workspace erp-agent-console run dev",
+    "build": "npm --workspace erp-agent-console run build",
+    "preview": "npm --workspace erp-agent-console run preview"
+  }
+}

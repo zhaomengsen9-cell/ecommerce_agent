@@ -6,11 +6,16 @@ import sys
 
 REQUIRED_IMPORTS = {
     "deepagents": "deepagents",
+    "fastapi": "fastapi",
     "langchain_core": "langchain-core",
     "langchain_mcp_adapters": "langchain-mcp-adapters",
+    "langchain_deepseek": "langchain-deepseek",
     "langchain_openai": "langchain-openai",
     "mcp": "mcp",
+    "psycopg": "psycopg[binary]",
     "requests": "requests",
+    "sqlalchemy": "sqlalchemy",
+    "uvicorn": "uvicorn[standard]",
 }
 
 
