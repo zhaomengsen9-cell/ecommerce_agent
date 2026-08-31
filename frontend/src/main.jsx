@@ -29,6 +29,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [health, setHealth] = useState(null);
+  const [healthRefreshing, setHealthRefreshing] = useState(false);
   const [selectedConversationId, setSelectedConversationId] = useState("");
   const [searchText, setSearchText] = useState("");
   const [showTools, setShowTools] = useState(true);
@@ -66,6 +67,19 @@ function App() {
     setHealth(nextHealth);
     if (nextSelectedId) {
       setSelectedConversationId(nextSelectedId);
+    }
+  }
+
+  async function refreshHealth() {
+    if (!token || healthRefreshing) return;
+    setHealthRefreshing(true);
+    try {
+      const nextHealth = await api("/api/erp/health", token);
+      setHealth(nextHealth);
+    } catch (error) {
+      setHealth({ ok: false, detail: error.message });
+    } finally {
+      setHealthRefreshing(false);
     }
   }
 
@@ -112,7 +126,7 @@ function App() {
             <p className="eyebrow">E-commerce ERP Copilot</p>
             <h1>{activeView === "memory" ? "长期记忆" : viewTitle(selectedConversation)}</h1>
           </div>
-          <Health health={health} onRefresh={refresh} />
+          <Health health={health} onRefresh={refreshHealth} refreshing={healthRefreshing} />
         </header>
 
         {activeView === "memory" ? (
@@ -279,16 +293,26 @@ function Login({ onToken }) {
   );
 }
 
-function Health({ health, onRefresh }) {
+function Health({ health, onRefresh, refreshing }) {
   const ok = health?.ok;
+  const detail = typeof health?.detail === "string" ? health.detail : "";
   return (
     <div className={`health-card ${ok ? "ok" : "bad"}`}>
       {ok ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
       <div>
         <span>ERP 连接</span>
-        <strong>{ok ? "正常" : "待检查"}</strong>
+        <strong>{refreshing ? "检查中" : ok ? "正常" : "待检查"}</strong>
       </div>
-      <button className="health-refresh" onClick={onRefresh} title="刷新"><RefreshCw size={17} /></button>
+      <button
+        type="button"
+        className={`health-refresh ${refreshing ? "spinning" : ""}`}
+        onClick={onRefresh}
+        disabled={refreshing}
+        title={detail || "测试 ERP 连接"}
+        aria-label="测试 ERP 连接"
+      >
+        <RefreshCw size={17} />
+      </button>
     </div>
   );
 }

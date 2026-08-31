@@ -245,6 +245,21 @@ button {
   border: 1px solid var(--line);
 }
 
+.health-refresh:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.health-refresh.spinning svg {
+  animation: health-spin 0.9s linear infinite;
+}
+
+@keyframes health-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .chat-workspace {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

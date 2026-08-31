@@ -1,6 +1,5 @@
 .venv/
 .env
-.agent_memory/
 .agent_state/
 __pycache__/
 *.pyc

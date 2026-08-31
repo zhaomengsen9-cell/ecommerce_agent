@@ -82,6 +82,161 @@ docker run -d \
 DATABASE_URL=postgresql+psycopg://agent:agent123@localhost:5432/ecommerce_agent
 ```
 
+### Agent 数据库说明
+
+Agent 数据库与 ERPNext 数据库完全分离：
+
+- Agent 数据库：PostgreSQL，默认数据库名为 `ecommerce_agent`。
+- ERPNext 数据库：由 `frappe_docker/pwd.yml` 中的 MariaDB 服务管理。
+- Agent PostgreSQL 容器：`ecommerce-agent-postgres`。
+- PostgreSQL 数据卷：`ecommerce_agent_pgdata`。
+- 默认 schema：`public`。
+
+当前实现使用 SQLAlchemy 自动创建表。数据库表结构以
+`agent_console/backend/db_models.py` 为准，当前包含以下 8 张表：
+
+| 表名 | 用途 |
+| --- | --- |
+| `users` | Agent 系统用户和登录信息 |
+| `roles` | Agent 角色定义 |
+| `user_roles` | 用户与角色的多对多关系 |
+| `agent_conversations` | Web 控制台中的会话 |
+| `agent_tasks` | Agent 执行任务及执行结果 |
+| `agent_memories` | 长期记忆、任务摘要和人工备注 |
+| `agent_approvals` | 高风险 ERP 操作的审批记录 |
+| `audit_logs` | Agent 操作审计事件 |
+
+#### 表结构
+
+以下是当前 MVP 的实际字段格式。`JSON` 字段用于保存 Agent 计划、工具参数、工具结果等结构化数据；当前实现使用 `JSON`，不是独立的向量数据库。
+
+##### `users`
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | `integer` | 主键，自增 |
+| `username` | `varchar(64)` | 用户名，唯一且必填 |
+| `password_hash` | `varchar(255)` | PBKDF2 密码哈希 |
+| `display_name` | `varchar(128)` | 显示名称，可为空 |
+| `status` | `varchar(32)` | 用户状态，默认 `active` |
+| `created_at` | `timestamptz` | 创建时间 |
+| `updated_at` | `timestamptz` | 更新时间 |
+
+##### `roles` / `user_roles`
+
+`roles` 保存角色，`user_roles` 保存用户与角色的关联：
+
+| 表名 | 字段 | 类型 | 说明 |
+| --- | --- | --- | --- |
+| `roles` | `id` | `integer` | 主键，自增 |
+| `roles` | `name` | `varchar(64)` | 角色名，唯一且必填 |
+| `roles` | `description` | `text` | 角色描述，可为空 |
+| `user_roles` | `user_id` | `integer` | 外键，关联 `users.id` |
+| `user_roles` | `role_id` | `integer` | 外键，关联 `roles.id` |
+
+`user_roles` 使用 (`user_id`, `role_id`) 作为联合主键。
+
+##### `agent_conversations`
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | `varchar(36)` | 主键，UUID 字符串 |
+| `user_id` | `integer` | 外键，关联 `users.id` |
+| `title` | `varchar(120)` | 会话标题 |
+| `summary` | `text` | 会话摘要，可为空 |
+| `created_at` | `timestamptz` | 创建时间 |
+| `updated_at` | `timestamptz` | 更新时间 |
+
+##### `agent_tasks`
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | `varchar(36)` | 主键，UUID 字符串 |
+| `conversation_id` | `varchar(36)` | 外键，关联 `agent_conversations.id`，可为空 |
+| `user_id` | `integer` | 外键，关联 `users.id` |
+| `title` | `varchar(255)` | 任务标题，可为空 |
+| `prompt` | `text` | 用户提交的任务内容 |
+| `status` | `varchar(32)` | `queued`、`running`、`waiting_approval`、`needs_input`、`succeeded`、`failed`、`cancelled` |
+| `priority` | `integer` | 优先级，默认 `0` |
+| `input_context` | `JSON` | 输入上下文，可为空 |
+| `plan` | `JSON` | Agent 计划、待审批或待补充信息，可为空 |
+| `result` | `JSON` | Agent 最终结果，可为空 |
+| `error_message` | `text` | 失败原因，可为空 |
+| `created_at` | `timestamptz` | 创建时间 |
+| `updated_at` | `timestamptz` | 更新时间 |
+| `started_at` | `timestamptz` | 开始执行时间，可为空 |
+| `finished_at` | `timestamptz` | 完成时间，可为空 |
+
+##### `agent_memories`
+
+长期记忆页面读写的就是这张表。任务成功后，系统也会自动写入 `task_summary` 类型的记忆。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | `varchar(36)` | 主键，UUID 字符串 |
+| `user_id` | `integer` | 外键，关联 `users.id` |
+| `conversation_id` | `varchar(36)` | 外键，关联 `agent_conversations.id`，可为空 |
+| `source_task_id` | `varchar(36)` | 来源任务，关联 `agent_tasks.id`，可为空 |
+| `memory_type` | `varchar(64)` | 记忆类型，如 `manual_note`、`task_summary` |
+| `content` | `text` | 记忆正文 |
+| `memory_metadata` | `JSON` | 记忆元数据，如是否自动生成 |
+| `created_at` | `timestamptz` | 创建时间 |
+| `updated_at` | `timestamptz` | 更新时间 |
+
+##### `agent_approvals`
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | `varchar(36)` | 主键，UUID 字符串 |
+| `task_id` | `varchar(36)` | 外键，关联 `agent_tasks.id` |
+| `user_id` | `integer` | 外键，关联 `users.id` |
+| `status` | `varchar(32)` | `pending`、`approved`、`rejected`、`executed` |
+| `action` | `varchar(128)` | 审批动作 |
+| `risk` | `text` | 风险说明 |
+| `details` | `text` | 操作详情 |
+| `tool_name` | `varchar(128)` | 需要审批的工具名 |
+| `tool_args` | `JSON` | 工具调用参数 |
+| `decision_note` | `text` | 审批备注，可为空 |
+| `execution_result` | `JSON` | 执行结果，可为空 |
+| `created_at` | `timestamptz` | 创建时间 |
+| `decided_at` | `timestamptz` | 审批时间，可为空 |
+
+##### `audit_logs`
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | `integer` | 主键，自增 |
+| `user_id` | `integer` | 外键，关联 `users.id`，可为空 |
+| `task_id` | `varchar(36)` | 外键，关联 `agent_tasks.id`，可为空 |
+| `event_type` | `varchar(64)` | 审计事件类型 |
+| `event_payload` | `JSON` | 事件详情，可为空 |
+| `created_at` | `timestamptz` | 创建时间 |
+
+#### 查询 Agent 数据库
+
+进入 PostgreSQL 容器：
+
+```bash
+docker exec -it ecommerce-agent-postgres psql -U agent -d ecommerce_agent
+```
+
+查看表：
+
+```sql
+\dt
+\d agent_memories
+```
+
+查看长期记忆：
+
+```sql
+SELECT id, memory_type, content, created_at, updated_at
+FROM agent_memories
+ORDER BY updated_at DESC;
+```
+
+Agent 数据库的数据不会写入 ERPNext 数据库，长期记忆统一存储在 PostgreSQL 的 `agent_memories` 表中。
+
 检查当前 conda 环境是否装齐 Agent 依赖：
 
 ```bash
