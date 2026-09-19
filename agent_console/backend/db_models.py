@@ -78,6 +78,8 @@ class AgentTask(Base):
     input_context: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     plan: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     result: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    tool_call_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_tool_calls: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
     error_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

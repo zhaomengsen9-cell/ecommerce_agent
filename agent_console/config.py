@@ -19,6 +19,16 @@ def _load_dotenv(path: Path) -> None:
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
+def _positive_int_env(name: str, default: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a positive integer.") from exc
+    if value < 1:
+        raise ValueError(f"{name} must be a positive integer.")
+    return value
+
+
 _load_dotenv(ROOT / ".env")
 
 
@@ -34,6 +44,10 @@ class Settings:
     agent_model: str = os.getenv("AGENT_MODEL", "openai:gpt-4.1")
     human_approval_mode: str = os.getenv("HUMAN_APPROVAL_MODE", "web")
     erp_mcp_transport: str = os.getenv("ERP_MCP_TRANSPORT", "stdio")
+    redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    agent_queue_name: str = os.getenv("AGENT_QUEUE_NAME", "ecommerce-agent")
+    agent_job_timeout: int = int(os.getenv("AGENT_JOB_TIMEOUT", "3600"))
+    agent_max_tool_calls: int = _positive_int_env("AGENT_MAX_TOOL_CALLS", 30)
 
 
 settings = Settings()

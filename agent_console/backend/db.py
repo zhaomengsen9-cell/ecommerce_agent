@@ -60,6 +60,33 @@ def _ensure_legacy_schema() -> None:
     if "agent_tasks" not in table_names:
         return
     columns = {column["name"] for column in inspector.get_columns("agent_tasks")}
+    if "tool_call_count" not in columns:
+        with engine.begin() as connection:
+            if engine.dialect.name == "postgresql":
+                connection.execute(
+                    text(
+                        "ALTER TABLE agent_tasks "
+                        "ADD COLUMN IF NOT EXISTS tool_call_count INTEGER NOT NULL DEFAULT 0"
+                    )
+                )
+            else:
+                connection.execute(text("ALTER TABLE agent_tasks ADD COLUMN tool_call_count INTEGER DEFAULT 0"))
+        columns.add("tool_call_count")
+    if "max_tool_calls" not in columns:
+        with engine.begin() as connection:
+            if engine.dialect.name == "postgresql":
+                connection.execute(
+                    text(
+                        "ALTER TABLE agent_tasks "
+                        "ADD COLUMN IF NOT EXISTS max_tool_calls INTEGER NOT NULL DEFAULT 30"
+                    )
+                )
+            else:
+                connection.execute(text("ALTER TABLE agent_tasks ADD COLUMN max_tool_calls INTEGER DEFAULT 30"))
+        columns.add("max_tool_calls")
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE agent_tasks SET tool_call_count = 0 WHERE tool_call_count IS NULL"))
+        connection.execute(text("UPDATE agent_tasks SET max_tool_calls = 30 WHERE max_tool_calls IS NULL"))
     if "conversation_id" in columns:
         return
     with engine.begin() as connection:

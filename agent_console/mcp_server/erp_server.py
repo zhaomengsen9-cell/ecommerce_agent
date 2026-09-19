@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
 
 from agent_console.mcp_server.erp_client import erp_client
 from agent_console.mcp_server.tools import (
@@ -12,7 +11,7 @@ from agent_console.mcp_server.tools import (
     register_product_tools,
 )
 from agent_console.sandbox_gateway.permission import ApprovalRequest, require_approval
-
+from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("frappe-ecommerce-erp")
 

@@ -43,6 +43,8 @@ class TaskStatusResponse(BaseModel):
     created_at: str
     updated_at: str
     result: Any | None = None
+    tool_call_count: int = 0
+    max_tool_calls: int = 30
     approval: Any | None = None
     input_request: Any | None = None
     error: str | None = None

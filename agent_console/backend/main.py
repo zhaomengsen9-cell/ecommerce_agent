@@ -83,13 +83,13 @@ async def run_agent_task(payload: RunTaskRequest, user: Annotated[CurrentUser, D
 
 
 @app.get("/api/agent/tasks", response_model=list[TaskStatusResponse])
-def tasks(_: Annotated[CurrentUser, Depends(get_current_user)]) -> list[TaskStatusResponse]:
-    return [TaskStatusResponse(**task) for task in list_tasks()]
+def tasks(user: Annotated[CurrentUser, Depends(get_current_user)]) -> list[TaskStatusResponse]:
+    return [TaskStatusResponse(**task) for task in list_tasks(user.username)]
 
 
 @app.get("/api/agent/tasks/{task_id}", response_model=TaskStatusResponse)
-def task_status(task_id: str, _: Annotated[CurrentUser, Depends(get_current_user)]) -> TaskStatusResponse:
-    task = get_task(task_id)
+def task_status(task_id: str, user: Annotated[CurrentUser, Depends(get_current_user)]) -> TaskStatusResponse:
+    task = get_task(task_id, user.username)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return TaskStatusResponse(**task)

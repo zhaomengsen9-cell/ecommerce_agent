@@ -8,6 +8,7 @@ from typing import Any
 
 from agent_console.agents.hitl_tools import request_human_input
 from agent_console.agents.sub_agents import SUBAGENTS
+from agent_console.agents.tool_budget import ToolCallBudget, ToolCallBudgetMiddleware
 from agent_console.config import ROOT, settings
 
 
@@ -28,17 +29,28 @@ def mcp_stdio_config() -> dict[str, Any]:
     }
 
 
-async def build_agent():
+async def build_agent(task_id: str | None = None):
     from deepagents import create_deep_agent
     from langchain_mcp_adapters.client import MultiServerMCPClient
 
     client = MultiServerMCPClient(mcp_stdio_config())
     tools = await client.get_tools()
     tools.append(request_human_input)
+    budget_middleware = ToolCallBudgetMiddleware(
+        ToolCallBudget(task_id=task_id, max_calls=settings.agent_max_tool_calls)
+    )
+    subagents = [
+        {
+            **spec,
+            "middleware": [*spec.get("middleware", []), budget_middleware],
+        }
+        for spec in SUBAGENTS
+    ]
     return create_deep_agent(
         tools=tools,
         system_prompt=load_system_prompt(),
-        subagents=SUBAGENTS,
+        middleware=[budget_middleware],
+        subagents=subagents,
         model=settings.agent_model,
     )
 
@@ -51,8 +63,8 @@ def load_system_prompt() -> str:
     return content or FALLBACK_INSTRUCTIONS
 
 
-async def run_task(task: str) -> Any:
-    agent = await build_agent()
+async def run_task(task: str, task_id: str | None = None) -> Any:
+    agent = await build_agent(task_id=task_id)
     return await agent.ainvoke({"messages": [{"role": "user", "content": task}]})
 
 

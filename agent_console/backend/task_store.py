@@ -8,6 +8,12 @@ from typing import Any
 from agent_console.agents.main_agent import run_task
 from agent_console.backend.db import db_session
 from agent_console.backend.db_models import AgentApproval, AgentConversation, AgentMemory, AgentTask, User
+from agent_console.backend.task_queue import (
+    enqueue_agent_task,
+    enqueue_approval_task,
+    enqueue_human_input_task,
+)
+from agent_console.config import settings
 from agent_console.mcp_server.erp_client import erp_client
 
 
@@ -46,13 +52,18 @@ def create_task(prompt: str, username: str, conversation_id: str | None = None) 
             title=prompt[:120],
             prompt=prompt,
             status="queued",
+            max_tool_calls=settings.agent_max_tool_calls,
             created_at=now,
             updated_at=now,
         )
         session.add(task)
         session.flush()
         record = _serialize_task(task)
-    asyncio.create_task(_execute(task_id, prompt))
+    try:
+        enqueue_agent_task(task_id)
+    except Exception as exc:
+        _mark_dispatch_failed(task_id, f"Unable to enqueue task: {exc}")
+        raise RuntimeError("Agent task queue is unavailable.") from exc
     return record
 
 
@@ -71,29 +82,45 @@ def reset_stale_tasks(max_age_minutes: int = 15) -> None:
             task.updated_at = task.finished_at
 
 
-def get_task(task_id: str) -> dict[str, Any] | None:
+def get_task(task_id: str, username: str) -> dict[str, Any] | None:
     with db_session() as session:
-        task = session.query(AgentTask).filter(AgentTask.id == task_id).one_or_none()
+        task = (
+            session.query(AgentTask)
+            .join(User, AgentTask.user_id == User.id)
+            .filter(AgentTask.id == task_id, User.username == username)
+            .one_or_none()
+        )
         return _serialize_task(task) if task is not None else None
 
 
-def list_tasks() -> list[dict[str, Any]]:
+def list_tasks(username: str) -> list[dict[str, Any]]:
     with db_session() as session:
-        tasks = session.query(AgentTask).order_by(AgentTask.created_at.desc()).all()
+        tasks = (
+            session.query(AgentTask)
+            .join(User, AgentTask.user_id == User.id)
+            .filter(User.username == username)
+            .order_by(AgentTask.created_at.desc())
+            .all()
+        )
         return [_serialize_task(task) for task in tasks]
 
 
-async def _execute(task_id: str, prompt: str) -> None:
+def execute_task_job(task_id: str) -> None:
+    asyncio.run(_execute(task_id))
+
+
+async def _execute(task_id: str) -> None:
     now = _now()
     with db_session() as session:
         task = session.get(AgentTask, task_id)
-        if task is None:
+        if task is None or task.status != "queued":
             return
+        prompt = task.prompt
         task.status = "running"
         task.started_at = now
         task.updated_at = now
     try:
-        result = _json_safe(await run_task(_build_agent_prompt(task_id, prompt)))
+        result = _json_safe(await run_task(_build_agent_prompt(task_id, prompt), task_id=task_id))
         with db_session() as session:
             task = session.get(AgentTask, task_id)
             if task is None:
@@ -145,6 +172,8 @@ def _serialize_task(task: AgentTask) -> dict[str, Any]:
         "created_at": task.created_at.isoformat(),
         "updated_at": task.updated_at.isoformat(),
         "result": task.result,
+        "tool_call_count": task.tool_call_count,
+        "max_tool_calls": task.max_tool_calls,
         "approval": _serialize_approval(_latest_approval_for_task(task.id)),
         "input_request": task.plan.get("pending_human_input") if isinstance(task.plan, dict) else None,
         "error": task.error_message,
@@ -153,27 +182,48 @@ def _serialize_task(task: AgentTask) -> dict[str, Any]:
 
 def approve_task(task_id: str, username: str, note: str | None = None) -> dict[str, Any]:
     with db_session() as session:
-        approval = _get_pending_approval(session, task_id, username)
+        approval = _get_approval_for_update(session, task_id, username)
+        if approval.status != "pending":
+            return _serialize_approval(approval)
         approval.status = "approved"
         approval.decision_note = note
         approval.decided_at = _now()
-        task = session.get(AgentTask, task_id)
+        task = (
+            session.query(AgentTask)
+            .join(User, AgentTask.user_id == User.id)
+            .filter(AgentTask.id == task_id, User.username == username)
+            .with_for_update()
+            .one_or_none()
+        )
         if task is None:
             raise LookupError("Task not found")
         task.status = "running"
         task.updated_at = _now()
         record = _serialize_approval(approval)
-    asyncio.create_task(_continue_after_approval(task_id))
+        approval_id = approval.id
+    try:
+        enqueue_approval_task(task_id, approval_id)
+    except Exception as exc:
+        _mark_dispatch_failed(task_id, f"Unable to enqueue approved task: {exc}")
+        raise RuntimeError("Agent task queue is unavailable.") from exc
     return record
 
 
 def reject_task(task_id: str, username: str, note: str | None = None) -> dict[str, Any]:
     with db_session() as session:
-        approval = _get_pending_approval(session, task_id, username)
+        approval = _get_approval_for_update(session, task_id, username)
+        if approval.status != "pending":
+            return _serialize_approval(approval)
         approval.status = "rejected"
         approval.decision_note = note
         approval.decided_at = _now()
-        task = session.get(AgentTask, task_id)
+        task = (
+            session.query(AgentTask)
+            .join(User, AgentTask.user_id == User.id)
+            .filter(AgentTask.id == task_id, User.username == username)
+            .with_for_update()
+            .one_or_none()
+        )
         if task is None:
             raise LookupError("Task not found")
         task.status = "cancelled"
@@ -197,6 +247,7 @@ def provide_task_input(task_id: str, username: str, response: str) -> dict[str, 
             session.query(AgentTask)
             .join(User, AgentTask.user_id == User.id)
             .filter(AgentTask.id == task_id, User.username == username, AgentTask.status == "needs_input")
+            .with_for_update()
             .one_or_none()
         )
         if task is None:
@@ -206,7 +257,11 @@ def provide_task_input(task_id: str, username: str, response: str) -> dict[str, 
         task.status = "running"
         task.updated_at = _now()
         record = _serialize_task(task)
-    asyncio.create_task(_continue_after_human_input(task_id, response, input_request))
+    try:
+        enqueue_human_input_task(task_id, response, input_request)
+    except Exception as exc:
+        _mark_dispatch_failed(task_id, f"Unable to enqueue human-input continuation: {exc}")
+        raise RuntimeError("Agent task queue is unavailable.") from exc
     return record
 
 
@@ -243,6 +298,10 @@ def _to_jsonable(value: Any) -> Any:
     return value
 
 
+def continue_after_approval_job(task_id: str) -> None:
+    asyncio.run(_continue_after_approval(task_id))
+
+
 async def _continue_after_approval(task_id: str) -> None:
     try:
         with db_session() as session:
@@ -250,16 +309,19 @@ async def _continue_after_approval(task_id: str) -> None:
                 session.query(AgentApproval)
                 .filter(AgentApproval.task_id == task_id, AgentApproval.status == "approved")
                 .order_by(AgentApproval.decided_at.desc())
+                .with_for_update()
                 .first()
             )
-            task = session.get(AgentTask, task_id)
+            task = session.query(AgentTask).filter(AgentTask.id == task_id).with_for_update().one_or_none()
             if approval is None or task is None:
                 return
+            # Hold the approval row lock through the ERP write. A duplicate queue
+            # job then observes "executed" and exits without repeating the write.
             execution_result = _json_safe(_execute_approved_tool(approval.tool_name, approval.tool_args))
             approval.execution_result = execution_result
             task.updated_at = _now()
             continuation_prompt = _build_approval_continuation_prompt(task.prompt, approval, execution_result)
-        result = _json_safe(await run_task(continuation_prompt))
+        result = _json_safe(await run_task(continuation_prompt, task_id=task_id))
         with db_session() as session:
             task = session.get(AgentTask, task_id)
             approval = (
@@ -343,6 +405,14 @@ def _find_human_input_payload(value: Any) -> dict[str, Any] | None:
     return None
 
 
+def continue_after_human_input_job(
+    task_id: str,
+    response: str,
+    input_request: dict[str, Any] | None,
+) -> None:
+    asyncio.run(_continue_after_human_input(task_id, response, input_request))
+
+
 async def _continue_after_human_input(task_id: str, response: str, input_request: dict[str, Any] | None) -> None:
     try:
         with db_session() as session:
@@ -350,7 +420,7 @@ async def _continue_after_human_input(task_id: str, response: str, input_request
             if task is None:
                 return
             continuation_prompt = _build_human_input_continuation_prompt(task.prompt, response, input_request)
-        result = _json_safe(await run_task(continuation_prompt))
+        result = _json_safe(await run_task(continuation_prompt, task_id=task_id))
         with db_session() as session:
             task = session.get(AgentTask, task_id)
             if task is None:
@@ -422,18 +492,44 @@ def _latest_approval_for_task(task_id: str) -> dict[str, Any] | None:
         return _serialize_approval(approval) if approval is not None else None
 
 
-def _get_pending_approval(session, task_id: str, username: str) -> AgentApproval:
+def _get_approval_for_update(session, task_id: str, username: str) -> AgentApproval:
     user = session.query(User).filter(User.username == username, User.status == "active").one_or_none()
     if user is None:
         raise LookupError("User not found")
     approval = (
         session.query(AgentApproval)
-        .filter(AgentApproval.task_id == task_id, AgentApproval.user_id == user.id, AgentApproval.status == "pending")
+        .filter(
+            AgentApproval.task_id == task_id,
+            AgentApproval.user_id == user.id,
+            AgentApproval.status == "pending",
+        )
+        .with_for_update()
         .one_or_none()
     )
     if approval is None:
-        raise LookupError("Pending approval not found")
+        # Repeated approve/reject requests return the already-decided record
+        # instead of scheduling another execution.
+        approval = (
+            session.query(AgentApproval)
+            .filter(AgentApproval.task_id == task_id, AgentApproval.user_id == user.id)
+            .order_by(AgentApproval.created_at.desc())
+            .with_for_update()
+            .first()
+        )
+    if approval is None:
+        raise LookupError("Approval not found")
     return approval
+
+
+def _mark_dispatch_failed(task_id: str, message: str) -> None:
+    with db_session() as session:
+        task = session.get(AgentTask, task_id)
+        if task is None:
+            return
+        task.status = "failed"
+        task.error_message = message[:1000]
+        task.finished_at = _now()
+        task.updated_at = task.finished_at
 
 
 def _serialize_approval(approval: AgentApproval | dict[str, Any] | None) -> dict[str, Any] | None:

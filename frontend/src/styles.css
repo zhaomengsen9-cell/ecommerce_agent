@@ -482,6 +482,15 @@ h1 {
   background: #7d5ef6;
 }
 
+.tool-budget {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 9px 0 2px;
+  color: #7a857f;
+  font-size: 12px;
+}
+
 .typing-line {
   display: flex;
   align-items: center;

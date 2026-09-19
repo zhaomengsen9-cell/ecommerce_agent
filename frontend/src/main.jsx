@@ -430,6 +430,10 @@ function ChatTurn({ task, showTools }) {
             <span>AI</span>
             <Status status={task.status} />
           </div>
+          <div className="tool-budget">
+            <Wrench size={14} />
+            <span>工具调用 {task.tool_call_count ?? 0}/{task.max_tool_calls ?? 30}</span>
+          </div>
           {isRunning && <TypingLine />}
           {task.error && <pre className="error-box">{task.error}</pre>}
           {showTools && <TraceDetails trace={trace} collapsed={task.status === "succeeded"} />}

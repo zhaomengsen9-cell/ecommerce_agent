@@ -13,7 +13,9 @@ REQUIRED_IMPORTS = {
     "langchain_openai": "langchain-openai",
     "mcp": "mcp",
     "psycopg": "psycopg[binary]",
+    "redis": "redis",
     "requests": "requests",
+    "rq": "rq",
     "sqlalchemy": "sqlalchemy",
     "uvicorn": "uvicorn[standard]",
 }

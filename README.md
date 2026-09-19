@@ -76,11 +76,26 @@ docker run -d \
   postgres:16
 ```
 
+启动 Agent Redis 队列:
+
+```bash
+docker run -d \
+  --name ecommerce-agent-redis \
+  -p 6379:6379 \
+  redis:7
+```
+
 在 `.env` 中配置 Agent 数据库连接:
 
 ```env
 DATABASE_URL=postgresql+psycopg://agent:agent123@localhost:5432/ecommerce_agent
+REDIS_URL=redis://localhost:6379/0
+AGENT_QUEUE_NAME=ecommerce-agent
+AGENT_JOB_TIMEOUT=3600
+AGENT_MAX_TOOL_CALLS=30
 ```
+
+`AGENT_MAX_TOOL_CALLS` 是单个 `agent_tasks` 的共享工具调用预算，主 Agent、子 Agent 和 DeepAgents 内置工具都会计入同一个计数。达到上限后，系统会在下一个工具真正执行前停止任务，将状态改为 `failed`，并把原因写入 `error_message`；当前已用次数和上限会通过任务接口返回并显示在前端。
 
 ### Agent 数据库说明
 
@@ -161,6 +176,8 @@ Agent 数据库与 ERPNext 数据库完全分离：
 | `input_context` | `JSON` | 输入上下文，可为空 |
 | `plan` | `JSON` | Agent 计划、待审批或待补充信息，可为空 |
 | `result` | `JSON` | Agent 最终结果，可为空 |
+| `tool_call_count` | `integer` | 当前任务已消耗的工具调用次数 |
+| `max_tool_calls` | `integer` | 当前任务允许的最大工具调用次数 |
 | `error_message` | `text` | 失败原因，可为空 |
 | `created_at` | `timestamptz` | 创建时间 |
 | `updated_at` | `timestamptz` | 更新时间 |
@@ -262,6 +279,14 @@ python scripts/check_dependencies.py
 ```bash
 ./scripts/run_api.sh
 ```
+
+启动 Agent Worker（需要与 FastAPI 分开运行）:
+
+```bash
+./scripts/run_worker.sh
+```
+
+FastAPI 只负责认证、任务入库和状态查询；Agent 的实际执行由 Redis 队列中的 RQ Worker 完成。可以启动多个 Worker 来提高任务并行度，但每个 Worker 都会消耗模型 API、MCP 子进程和 ERPNext 连接资源，应根据机器容量设置数量。
 
 启动 React 前端:
 

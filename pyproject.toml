@@ -13,7 +13,9 @@ dependencies = [
   "mcp>=1.28.1",
   "pydantic>=2.7.0",
   "psycopg[binary]>=3.2.0",
+  "redis>=5.0.0",
   "requests>=2.34.2",
+  "rq>=2.0.0",
   "sqlalchemy>=2.0.0",
   "uvicorn[standard]>=0.30.0",
 ]
